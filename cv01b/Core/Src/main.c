@@ -65,8 +65,8 @@ static void MX_USART2_UART_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
-  /* USER CODE END 1 */
+	//RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
+	/* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -95,6 +95,11 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  //HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 1);
+	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+	  for (volatile uint32_t i = 0; i < 100000; i++) {}
+
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
