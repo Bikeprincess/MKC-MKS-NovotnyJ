@@ -23,18 +23,105 @@
   #warning "FPU is not initialized, but the project is compiling for an FPU. Please initialize the FPU before use."
 #endif
 
+typedef enum {dot = 0, dash, space} MorC_e;
+typedef struct {uint8_t chars; MorC_e mc[4];} MorC_t;
 
+const MorC_t MorseCode[26] =
+{
+	{.chars = 2, .mc = {dot, dash}},//a
+	{.chars = 3, .mc = {dash, dot, dot, dot}},//b
+	{.chars = 4, .mc = {dash, dot, dash, dot}},//c
+	{.chars = 3, .mc = {dash, dot, dot}},//d
+	{.chars = 1, .mc = {dot}},//e
+	{.chars = 4, .mc = {dot, dot, dash, dot}},//f
+	{.chars = 3, .mc = {dash, dash, dot}},//g
+	{.chars = 4, .mc = {dot, dot, dot, dot}},//h
+	{.chars = 2, .mc = {dot, dot}},//i
+	{.chars = 4, .mc = {dot, dash, dash, dash}},//j
+	{.chars = 3, .mc = {dash, dot, dash}},//k
+	{.chars = 4, .mc = {dot, dash, dot, dot}},//l
+	{.chars = 2, .mc = {dash, dash}},//m
+	{.chars = 2, .mc = {dash, dot}},//n
+	{.chars = 3, .mc = {dash, dash, dash}},//o
+	{.chars = 4, .mc = {dot, dash, dash, dot}},//p
+	{.chars = 4, .mc = {dash, dot, dash, dash}},//q
+	{.chars = 3, .mc = {dot, dash, dot}},//r
+	{.chars = 3, .mc = {dot, dot, dot}},//s
+	{.chars = 1, .mc = {dash}},//t
+	{.chars = 3, .mc = {dot, dot, dash}},//u
+	{.chars = 4, .mc = {dot, dot, dot, dash}},//v
+	{.chars = 3, .mc = {dot, dash, dash}},//w
+	{.chars = 4, .mc = {dash, dot, dot, dash}},//x
+	{.chars = 4, .mc = {dash, dot, dash, dash}},//y
+	{.chars = 4, .mc = {dash, dash, dot, dot}},//z
+};
 
+void vShowChar(MorC_e character);
+void vDelay(MorC_e type);
+
+#define MAX_STRING_LENGTH	10
+const uint8_t String[MAX_STRING_LENGTH] = "sos";//String for show at led in morse code
 
 int main(void)
 {
 
 	RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
 	GPIOA->MODER |= GPIO_MODER_MODER5_0;
+	GPIOA->BRR = (1<<5);// turn off led at start
     /* Loop forever */
 	for(;;)
 	{
-		GPIOA->ODR ^= (1<<5);
-		for (volatile uint32_t i = 0; i < 100000; i++) {}
+		//Convert string to number - usage in array of characters
+		uint8_t StringToShow[MAX_STRING_LENGTH] = {0};
+		uint8_t StringLength = 0;
+		for (volatile uint8_t i = 0; i < MAX_STRING_LENGTH; i++)
+		{
+			if(String[i] == '\0')//Check for string end
+			{
+				StringLength = i;//save string length
+				break;
+			}
+			if (String[i] >= 'a' && String[i] <= 'z') StringToShow[i] = String[i] - 'a';
+			else if (String[i] >= 'A' && String[i] <= 'Z') StringToShow[i] = String[i] - 'A';
+			else StringToShow[i] = 0;//Just define 0 - its a char - no error handling
+		}
+
+		for (volatile uint8_t i = 0; i < StringLength; i++)
+		{
+			vShowChar(StringToShow[i]);
+		}
+		//GPIOA->ODR ^= (1<<5);
 	}
+}
+
+void vShowChar(MorC_e character)
+{
+	for (volatile uint8_t i = 0; i < MorseCode[character].chars;i++)
+	{
+		GPIOA->BSRR = (1<<5);//turn on led
+		vDelay(MorseCode[character].mc[i]);
+		GPIOA->BRR = (1<<5);// turn off led
+		vDelay(space);//Delay after dot or dash
+	}
+	vDelay(space);//Delay after character
+	return;
+}
+
+void vDelay(MorC_e type)
+{
+	uint32_t DelayTime = 0;
+	switch(type)
+		{
+		case dot:
+			DelayTime = 100000;
+			break;
+		case dash:
+			DelayTime = 300000;
+			break;
+		case space:
+			DelayTime = 100000;
+			break;
+		}
+	for (volatile uint32_t i = 0; i < DelayTime; i++) {}
+	return;
 }
