@@ -40,12 +40,39 @@ int main(void)
 	// turn off led at start
 	GPIOA->BRR = (1<<5) | (1<<4);
 	GPIOB->BRR = (1<<0);
+	//INT
+	RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;//Povolení hodin
+	//From HW
+	SYSCFG->EXTICR[0] |= SYSCFG_EXTICR1_EXTI0_PC; // select PC0 for EXTI0
+	SYSCFG->EXTICR[3] |= SYSCFG_EXTICR4_EXTI13_PC; // select PC13 for EXTI13
+	EXTI->IMR |= EXTI_IMR_MR0 | EXTI_IMR_MR13; // mask
+	EXTI->FTSR |= EXTI_FTSR_TR0 | EXTI_FTSR_TR13; // trigger on falling edge
+	NVIC_EnableIRQ(EXTI0_1_IRQn); // enable EXTI0_1
+	NVIC_EnableIRQ(EXTI4_15_IRQn); // enable EXTI4_15 - for dev board
+
 
 
     /* Loop forever */
 	for(;;)
 	{
-		GPIOA->ODR ^= (1<<5); // toggle
-		for (volatile uint32_t i = 0; i < 100000; i++) {}
+		//GPIOA->ODR ^= (1<<5); // toggle
+		//for (volatile uint32_t i = 0; i < 100000; i++) {}
+	}
+}
+
+
+void EXTI4_15_IRQHandler(void)
+{
+	if (EXTI->PR & EXTI_PR_PR13) { // check line 0 has triggered the IT
+		EXTI->PR |= EXTI_PR_PR13; // clear the pending bit
+		GPIOA->ODR ^= (1<<5); // toggle led on dev board
+	}
+}
+
+void EXTI0_1_IRQHandler(void)
+{
+	if (EXTI->PR & EXTI_PR_PR0) { // check line 0 has triggered the IT
+		EXTI->PR |= EXTI_PR_PR0; // clear the pending bit
+		GPIOB->ODR ^= (1<<0);//Toggle led
 	}
 }
