@@ -23,13 +23,25 @@
   #warning "FPU is not initialized, but the project is compiling for an FPU. Please initialize the FPU before use."
 #endif
 
+//LED1 = PA4
+//LED2 = PB0
+//SW1 = PC1
+//SW2 = PC0
 
+//Led dev board - PA5
+//SW dev board - PC13
 
 int main(void)
 {
-	RCC->AHBENR |= RCC_AHBENR_GPIOAEN;
-	GPIOA->MODER |= GPIO_MODER_MODER5_0;
-	GPIOA->BRR = (1<<5);// turn off led at start
+	RCC->AHBENR |= RCC_AHBENR_GPIOAEN | RCC_AHBENR_GPIOBEN | RCC_AHBENR_GPIOCEN;//Clock enable for GPIO
+	GPIOA->MODER |= GPIO_MODER_MODER5_0 | GPIO_MODER_MODER4_0;//Output conf
+	GPIOB->MODER |= GPIO_MODER_MODER0_0;//Output conf
+	GPIOC->PUPDR |= GPIO_PUPDR_PUPDR0_0 | GPIO_PUPDR_PUPDR1_0 | GPIO_PUPDR_PUPDR13_0;//enable pull up
+	// turn off led at start
+	GPIOA->BRR = (1<<5) | (1<<4);
+	GPIOB->BRR = (1<<0);
+
+
     /* Loop forever */
 	for(;;)
 	{
