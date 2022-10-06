@@ -23,6 +23,9 @@
   #warning "FPU is not initialized, but the project is compiling for an FPU. Please initialize the FPU before use."
 #endif
 
+void blikac(void);
+
+#define LED_TIME_BLINK	300
 //LED1 = PA4
 //LED2 = PB0
 //SW1 = PC1
@@ -30,6 +33,8 @@
 
 //Led dev board - PA5
 //SW dev board - PC13
+
+volatile uint32_t Tick = 0;
 
 int main(void)
 {
@@ -49,7 +54,8 @@ int main(void)
 	EXTI->FTSR |= EXTI_FTSR_TR0 | EXTI_FTSR_TR13; // trigger on falling edge
 	NVIC_EnableIRQ(EXTI0_1_IRQn); // enable EXTI0_1
 	NVIC_EnableIRQ(EXTI4_15_IRQn); // enable EXTI4_15 - for dev board
-
+	//SysTicks
+	SysTick_Config(8000);//1 ms tick
 
 
     /* Loop forever */
@@ -57,6 +63,7 @@ int main(void)
 	{
 		//GPIOA->ODR ^= (1<<5); // toggle
 		//for (volatile uint32_t i = 0; i < 100000; i++) {}
+		blikac();
 	}
 }
 
@@ -76,3 +83,21 @@ void EXTI0_1_IRQHandler(void)
 		GPIOB->ODR ^= (1<<0);//Toggle led
 	}
 }
+
+void SysTick_Handler(void)
+{
+	Tick++;
+}
+
+void blikac(void)
+{
+	static uint32_t delay = 0;
+	if (Tick > (delay + LED_TIME_BLINK))
+	{
+		delay = Tick;
+		GPIOA->ODR ^= (1<<4); // toggle led on shield
+		GPIOA->ODR ^= (1<<5); // toggle led on dev board
+	}
+}
+
+
