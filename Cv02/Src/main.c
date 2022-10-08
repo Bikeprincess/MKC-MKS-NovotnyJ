@@ -17,6 +17,7 @@
  */
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "stm32f0xx.h"
 
 #if !defined(__SOFT_FP__) && defined(__ARM_FP)
@@ -24,8 +25,12 @@
 #endif
 
 void blikac(void);
+void tlacitka(void);
 
 #define LED_TIME_BLINK	300
+#define LED_TIME_SHORT	100
+#define LED_TIME_LONG	1000
+#define BUTTON_DELAY_TIME	40
 //LED1 = PA4
 //LED2 = PB0
 //SW1 = PC1
@@ -35,6 +40,7 @@ void blikac(void);
 //SW dev board - PC13
 
 volatile uint32_t Tick = 0;
+//volatile bool WakeUpButton = false;
 
 int main(void)
 {
@@ -52,8 +58,9 @@ int main(void)
 	SYSCFG->EXTICR[3] |= SYSCFG_EXTICR4_EXTI13_PC; // select PC13 for EXTI13
 	EXTI->IMR |= EXTI_IMR_MR0 | EXTI_IMR_MR13; // mask
 	EXTI->FTSR |= EXTI_FTSR_TR0 | EXTI_FTSR_TR13; // trigger on falling edge
-	NVIC_EnableIRQ(EXTI0_1_IRQn); // enable EXTI0_1
-	NVIC_EnableIRQ(EXTI4_15_IRQn); // enable EXTI4_15 - for dev board
+	//NVIC_EnableIRQ(EXTI0_1_IRQn); // enable EXTI0_1
+	//NVIC_EnableIRQ(EXTI4_15_IRQn); // enable EXTI4_15 - for dev board
+
 	//SysTicks
 	SysTick_Config(8000);//1 ms tick
 
@@ -64,10 +71,11 @@ int main(void)
 		//GPIOA->ODR ^= (1<<5); // toggle
 		//for (volatile uint32_t i = 0; i < 100000; i++) {}
 		blikac();
+		tlacitka();
 	}
 }
 
-
+/*
 void EXTI4_15_IRQHandler(void)
 {
 	if (EXTI->PR & EXTI_PR_PR13) { // check line 0 has triggered the IT
@@ -82,7 +90,7 @@ void EXTI0_1_IRQHandler(void)
 		EXTI->PR |= EXTI_PR_PR0; // clear the pending bit
 		GPIOB->ODR ^= (1<<0);//Toggle led
 	}
-}
+}*/
 
 void SysTick_Handler(void)
 {
@@ -96,8 +104,42 @@ void blikac(void)
 	{
 		delay = Tick;
 		GPIOA->ODR ^= (1<<4); // toggle led on shield
-		GPIOA->ODR ^= (1<<5); // toggle led on dev board
+		//GPIOA->ODR ^= (1<<5); // toggle led on dev board
 	}
 }
+
+void tlacitka(void)
+{
+	//Button check and turn on leds
+	static uint32_t delay = 0;
+	static uint32_t old_IDR = 0;
+	static uint32_t TurnOffLedTime = 0;
+	uint32_t new_IDR = GPIOC->IDR;
+	if (Tick > (delay + BUTTON_DELAY_TIME))
+	{
+		delay = Tick;
+		uint32_t FallingEdges = old_IDR & ~new_IDR;
+		if (FallingEdges & ((1<<0) | (1<<13)))//PC0 as short time
+		{
+			TurnOffLedTime = Tick + LED_TIME_SHORT;
+			GPIOB->BSRR = (1<<0);
+			GPIOA->BSRR = (1<<5);//For develop
+		}
+		if (FallingEdges & (1<<1))//PC1 as long time
+		{
+			TurnOffLedTime = Tick + LED_TIME_LONG;
+			GPIOB->BSRR = (1<<0);
+		}
+		old_IDR = new_IDR;//save new IDR to old
+	}
+
+	//Turning off the leds
+	if (Tick > TurnOffLedTime)
+	{
+		GPIOB->BRR = (1<<0);
+		GPIOA->BRR = (1<<5);//for develop
+	}
+}
+
 
 
