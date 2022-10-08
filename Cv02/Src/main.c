@@ -30,7 +30,7 @@ void tlacitka(void);
 #define LED_TIME_BLINK	300
 #define LED_TIME_SHORT	100
 #define LED_TIME_LONG	1000
-#define BUTTON_DELAY_TIME	40
+#define BUTTON_DELAY_TIME	5
 //LED1 = PA4
 //LED2 = PB0
 //SW1 = PC1
@@ -112,25 +112,31 @@ void tlacitka(void)
 {
 	//Button check and turn on leds
 	static uint32_t delay = 0;
-	static uint32_t old_IDR = 0;
 	static uint32_t TurnOffLedTime = 0;
 	uint32_t new_IDR = GPIOC->IDR;
+	static uint16_t debounce_SW1 = 0xFFFF, debounce_SW2 = 0xFFFF;
 	if (Tick > (delay + BUTTON_DELAY_TIME))
 	{
 		delay = Tick;
-		uint32_t FallingEdges = old_IDR & ~new_IDR;
-		if (FallingEdges & ((1<<0) | (1<<13)))//PC0 as short time
+		debounce_SW1 <<= 1;
+		debounce_SW2 <<= 1;
+		if (!(~new_IDR & (((1<<0) | (1<<13)))))//PC0 as short time - SW2
+			debounce_SW2 |= 0x00001;
+		if (!(~new_IDR & (((1<<1) | (1<<13)))))//PC1 as long time
+			debounce_SW1 |= 0x00001;
+
+		//Turn on led
+		if (debounce_SW1 == 0x7FFF)
+		{
+			TurnOffLedTime = Tick + LED_TIME_LONG;
+			GPIOB->BSRR = (1<<0);
+		}
+		if (debounce_SW2 == 0x7FFF)
 		{
 			TurnOffLedTime = Tick + LED_TIME_SHORT;
 			GPIOB->BSRR = (1<<0);
 			GPIOA->BSRR = (1<<5);//For develop
 		}
-		if (FallingEdges & (1<<1))//PC1 as long time
-		{
-			TurnOffLedTime = Tick + LED_TIME_LONG;
-			GPIOB->BSRR = (1<<0);
-		}
-		old_IDR = new_IDR;//save new IDR to old
 	}
 
 	//Turning off the leds
