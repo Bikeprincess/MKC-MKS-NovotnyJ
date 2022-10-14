@@ -22,13 +22,14 @@
 #define SCT_PIN_LA		(1<<5)
 #define SCT_PIN_OE		(1<<10)
 
-#define sct_clk(x) do { if (x) GPIOB->BSSR = SCT_PIN_CLK;else GPIOB->BRR = SCT_PIN_CLK;} while (0)
-#define sct_sdi(x) do { if (x) GPIOB->BSSR = SCT_PIN_SDI;else GPIOB->BRR = SCT_PIN_SDI;} while (0)
-#define sct_nla(x) do { if (x) GPIOB->BSSR = SCT_PIN_LA;else GPIOB->BRR = SCT_PIN_LA;} while (0)
-#define sct_noe(x) do { if (x) GPIOB->BSSR = SCT_PIN_OE;else GPIOB->BRR = SCT_PIN_OE;} while (0)
+#define sct_clk(x) do { if (x) GPIOB->BSRR = SCT_PIN_CLK;else GPIOB->BRR = SCT_PIN_CLK;} while (0)
+#define sct_sdi(x) do { if (x) GPIOB->BSRR = SCT_PIN_SDI;else GPIOB->BRR = SCT_PIN_SDI;} while (0)
+#define sct_nla(x) do { if (x) GPIOB->BSRR = SCT_PIN_LA;else GPIOB->BRR = SCT_PIN_LA;} while (0)
+#define sct_noe(x) do { if (x) GPIOB->BSRR = SCT_PIN_OE;else GPIOB->BRR = SCT_PIN_OE;} while (0)
 
 void sct_init(void);
 void sct_led(const uint32_t aVal);
+void sct_value(const uint32_t aVal);
 
 
 #endif /* SCT_H_ */
