@@ -28,12 +28,12 @@ int main(void)
 {
     /* Loop forever */
 	sct_init();
-	sct_led(0x7a5c36de);
-	/*uint32_t iValToShow = 0;
+	//sct_led(0x7a5c36de);
+	uint32_t iValToShow = 0;
 	for(;;)
 	{
 		iValToShow = iValToShow >= 999 ? 0 : iValToShow + 111;
 		sct_value(iValToShow);
 		for (volatile uint32_t i = 0; i < 1000000; i++) {}
-	}*/
+	}
 }
