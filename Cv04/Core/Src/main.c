@@ -32,6 +32,10 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define ADC_Q	12
+#define TEMP110_CAL_ADDR	((uint16_t*) ((uint32_t) 0x1FFFF7C2))
+#define TEMP30_CAL_ADDR		((uint16_t*) ((uint32_t) 0x1FFFF7B8))
+#define VREFINT_CAL_ADDR	((uint16_t*) ((uint32_t) 0x1FFFF7BA))
+#define BUTTON_DELAY_TIME	5
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -45,7 +49,11 @@ ADC_HandleTypeDef hadc;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
+static volatile uint32_t raw_pot = 0;
+static volatile uint32_t raw_temp = 0;
+static volatile uint32_t raw_volt = 0;
+static volatile enum {SHOW_POT, SHOW_VOLT, SHOW_TEMP } eState = SHOW_POT;
+static volatile uint32_t ulShowDataToTime = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -54,19 +62,56 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_ADC_Init(void);
 /* USER CODE BEGIN PFP */
-
+void tlacitka(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-static volatile uint32_t raw_pot = 0;
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
 	static uint32_t avg_pot = 0;
-	raw_pot = avg_pot >> ADC_Q;//calculate mean value
-	avg_pot -= raw_pot;//decrease accumulating with mean
-	avg_pot += HAL_ADC_GetValue(hadc);//inc accumulating value with new value from ADC
+	static uint32_t channel = 0;
+	if (channel == 0){
+		raw_pot = avg_pot >> ADC_Q;//calculate mean value
+		avg_pot -= raw_pot;//decrease accumulating with mean
+		avg_pot += HAL_ADC_GetValue(hadc);//inc accumulating value with new value from ADC
+	}
+	else if (channel == 1) raw_temp = HAL_ADC_GetValue(hadc);
+	else if (channel == 2) raw_volt = HAL_ADC_GetValue(hadc);
+
+	if (__HAL_ADC_GET_FLAG(hadc, ADC_FLAG_EOS)) channel = 0;
+	else channel++;
+}
+
+void tlacitka(void)
+{
+	//Button check and turn on leds
+	static uint32_t delay = 0;
+	static uint16_t debounce_SW1 = 0xFFFF, debounce_SW2 = 0xFFFF;
+	uint32_t iTickTime = HAL_GetTick();
+	if (iTickTime > (delay + BUTTON_DELAY_TIME))
+	{
+		delay = HAL_GetTick();
+		debounce_SW1 <<= 1;
+		debounce_SW2 <<= 1;
+		if (HAL_GPIO_ReadPin(BTN_S2_GPIO_Port, BTN_S2_Pin))
+			debounce_SW2 |= 0x00001;
+		if (HAL_GPIO_ReadPin(BTN_S1_GPIO_Port, BTN_S1_Pin))
+			debounce_SW1 |= 0x00001;
+
+		//Turn on led
+		if (debounce_SW1 == 0x7FFF)
+		{
+			eState = SHOW_VOLT;
+			ulShowDataToTime = iTickTime + 1000;
+		}
+		if (debounce_SW2 == 0x7FFF)
+		{
+			eState = SHOW_TEMP;
+			ulShowDataToTime = iTickTime + 1000;
+		}
+	}
 }
 /* USER CODE END 0 */
 
@@ -104,6 +149,7 @@ int main(void)
   sct_init();
   HAL_ADCEx_Calibration_Start(&hadc);
   HAL_ADC_Start(&hadc);
+  uint32_t ulDelaytime = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -113,9 +159,39 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  uint32_t ulRangedAnalog = ((float)raw_pot / (float)0xFFF) * (float)500;//ADC have 12-bit (0xFFF) - to 0..1 and multiply to max range
-	  sct_value(ulRangedAnalog/(500/9), ulRangedAnalog);//faster? - not using float variables
-	  HAL_Delay(50);
+	  tlacitka();
+	  uint32_t TickTime = HAL_GetTick();
+	  if ((ulDelaytime + 100) < TickTime)//some slow down for changing data on display
+	  {
+		  ulDelaytime = TickTime;
+		  if (ulShowDataToTime < TickTime) eState = SHOW_POT;
+		  //Just because switch
+		  uint32_t ulRangedAnalog = 0;
+		  uint32_t ulVoltage = 0;
+		  int32_t lTemp = 0;
+		  //switch for show right data
+		  switch (eState)
+		  {
+		  case SHOW_POT:
+			  ulRangedAnalog = ((float)raw_pot / (float)0xFFF) * (float)500;//ADC have 12-bit (0xFFF) - to 0..1 and multiply to max range
+			  sct_value(ulRangedAnalog/(500/9), ulRangedAnalog);//faster? - not using float variables
+			  break;
+		  case SHOW_VOLT:
+			  ulVoltage = 330 * (*VREFINT_CAL_ADDR) / raw_volt;
+			  sct_value(0, ulVoltage);
+			  break;
+		  case SHOW_TEMP:
+			  lTemp = (raw_temp - (int32_t)(*TEMP30_CAL_ADDR));
+			  lTemp *= (int32_t)(110-30);
+			  lTemp /= (int32_t)(*TEMP110_CAL_ADDR - *TEMP30_CAL_ADDR);
+			  lTemp += 30;
+			  sct_value(0, lTemp);
+			  break;
+		  default:
+			  eState = SHOW_POT;
+			  break;
+		  }
+	  }
   }
   /* USER CODE END 3 */
 }
@@ -208,6 +284,22 @@ static void MX_ADC_Init(void)
   {
     Error_Handler();
   }
+
+  /** Configure for the selected ADC regular channel to be converted.
+  */
+  sConfig.Channel = ADC_CHANNEL_TEMPSENSOR;
+  if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel to be converted.
+  */
+  sConfig.Channel = ADC_CHANNEL_VREFINT;
+  if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE BEGIN ADC_Init 2 */
 
   /* USER CODE END ADC_Init 2 */
@@ -274,6 +366,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pin = GPIO_PIN_13;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PC0 PC1 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PA5 */
