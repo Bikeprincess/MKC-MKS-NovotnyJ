@@ -57,7 +57,7 @@ void sct_led(const uint32_t aVal)
 	{
 		sct_sdi(iVal & 0x01);
 		sct_clk(1);
-		iVal <<= 1;
+		iVal >>= 1;
 		sct_clk(0);
 	}
 	sct_nla(1);
