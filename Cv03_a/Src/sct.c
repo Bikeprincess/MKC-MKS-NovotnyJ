@@ -47,6 +47,7 @@ void sct_init(void)
 	RCC->AHBENR |= RCC_AHBENR_GPIOBEN;//Clock enable for GPIO
 	GPIOB->MODER |= GPIO_MODER_MODER3_0 | GPIO_MODER_MODER4_0 | GPIO_MODER_MODER5_0 | GPIO_MODER_MODER10_0;//Output conf
 	GPIOB->BRR = SCT_PIN_CLK | SCT_PIN_SDI | SCT_PIN_LA | SCT_PIN_OE;
+	sct_led(0);
 	return;
 }
 
